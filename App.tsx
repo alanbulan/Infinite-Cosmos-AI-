@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Scene } from './components/Scene';
@@ -7,64 +6,59 @@ import { ControlBar } from './components/ControlBar';
 import { GalaxyMap } from './components/GalaxyMap';
 import { SystemNavigation } from './components/SystemNavigation';
 import { WarpEffect } from './components/WarpEffect';
+import { ApiKeyConfig } from './components/ApiKeyConfig';
 import { SOLAR_SYSTEM_ROOT } from './constants';
 import { CelestialBodyData, SimulationSettings, CosmicEvent } from './types';
 import { generateNewPlanetData, generateCosmicEvent } from './services/geminiService';
 import { generateRealisticSystem } from './services/realisticSystemGenerator'; 
 import { loadUniverseState, saveUniverseState } from './services/storageManager';
+import { hasValidKey } from './services/apiKeyManager';
 import { Radio, Zap, Loader2, Send } from 'lucide-react';
 import * as THREE from 'three';
 
 const App: React.FC = () => {
-  // === 核心状态 ===
   const [viewScope, setViewScope] = useState<'SYSTEM' | 'GALAXY'>('SYSTEM');
-  
-  // 初始化时从 LocalStorage 加载
   const [systems, setSystems] = useState<Record<string, CelestialBodyData>>(() => loadUniverseState());
-
   const [currentSystemId, setCurrentSystemId] = useState<string>('sun');
   const [selectedBody, setSelectedBody] = useState<CelestialBodyData | null>(null);
   const [viewMode, setViewMode] = useState<'focus' | 'galaxy'>('galaxy');
-  
-  // 交互状态
   const [isGenerating, setIsGenerating] = useState(false);
   const [isWarping, setIsWarping] = useState(false); 
   const [loadingMessage, setLoadingMessage] = useState<string>("");
   const [currentEvent, setCurrentEvent] = useState<CosmicEvent | null>(null);
+  const [hasApiKey, setHasApiKey] = useState<boolean>(hasValidKey());
 
   const [settings, setSettings] = useState<SimulationSettings>({
     timeScale: 1.0,
     orbitScale: 1.0,
-    bodyScale: 1.5, // 内部固定为1.5倍，视觉效果最好
-    quality: 'MEDIUM', // 默认为中等画质
+    bodyScale: 1.5,
+    quality: 'MEDIUM',
     showOrbits: true,
     showLabels: false,
     paused: false
   });
 
-  // 自动保存
   useEffect(() => {
     saveUniverseState(systems);
   }, [systems]);
 
-  // === 逻辑处理 ===
+  const handleKeyUpdate = () => {
+      setHasApiKey(hasValidKey());
+  };
 
   const handleSwitchToGalaxyMap = () => {
-    setSelectedBody(null); // 切换视图时清除选中
+    setSelectedBody(null);
     setViewScope('GALAXY');
     setSettings(prev => ({ ...prev, paused: true }));
   };
 
-  // 跃迁核心逻辑
   const handleWarpToSystem = async (id: string, position: THREE.Vector3) => {
     if (id === currentSystemId && viewScope === 'SYSTEM') {
-        // 已经在当前星系，无需跃迁，直接切回视图
         setViewScope('SYSTEM');
         setSettings(prev => ({ ...prev, paused: false }));
         return;
     }
 
-    // 1. 开始生成或加载数据
     setLoadingMessage(`正在锁定星标: ${id.toUpperCase()} ...`);
     setIsGenerating(true);
 
@@ -75,7 +69,6 @@ const App: React.FC = () => {
              targetSystem = SOLAR_SYSTEM_ROOT;
         } else {
             setLoadingMessage("正在进行光谱分析与质量测算...");
-            // 使用 Realistic Generator 生成
             targetSystem = await generateRealisticSystem(id, { x: position.x, y: position.y, z: position.z });
             setSystems(prev => ({ ...prev, [id]: targetSystem! }));
         }
@@ -83,22 +76,15 @@ const App: React.FC = () => {
 
     setIsGenerating(false);
     setLoadingMessage("");
-
-    // 2. 开始跃迁动画
     setIsWarping(true);
     
-    // 3. 动画结束后切换场景
     setTimeout(() => {
         setCurrentSystemId(id);
         setViewScope('SYSTEM');
         setSettings(prev => ({ ...prev, paused: false }));
         setViewMode('galaxy'); 
         setSelectedBody(null);
-        
-        setTimeout(() => {
-            setIsWarping(false);
-        }, 500);
-
+        setTimeout(() => { setIsWarping(false); }, 500);
     }, 2500); 
   };
 
@@ -115,7 +101,7 @@ const App: React.FC = () => {
   };
 
   const handleAddPlanet = async () => {
-    if (!activeSystemData.children) return;
+    if (!activeSystemData.children || !hasApiKey) return;
     setIsGenerating(true);
     setLoadingMessage("正在演算轨道参数...");
     
@@ -126,11 +112,7 @@ const App: React.FC = () => {
             ...activeSystemData,
             children: [...(activeSystemData.children || []), newPlanet]
         };
-        
-        setSystems(prev => ({
-            ...prev,
-            [currentSystemId]: updatedSystem
-        }));
+        setSystems(prev => ({ ...prev, [currentSystemId]: updatedSystem }));
     }
     setIsGenerating(false);
     setLoadingMessage("");
@@ -138,6 +120,9 @@ const App: React.FC = () => {
 
   useEffect(() => {
      if (settings.paused && viewScope === 'SYSTEM') return;
+     // Only generate events if API key exists
+     if (!hasApiKey) return;
+
      const interval = setInterval(async () => {
          if (Math.random() > 0.7 && viewScope === 'SYSTEM' && !isWarping) {
              const evt = await generateCosmicEvent();
@@ -148,14 +133,13 @@ const App: React.FC = () => {
          }
      }, 45000);
      return () => clearInterval(interval);
-  }, [settings.paused, viewScope, isWarping]);
+  }, [settings.paused, viewScope, isWarping, hasApiKey]);
 
   return (
     <div className="w-full h-screen relative overflow-hidden bg-black font-sans select-none">
       
-      {/* === 场景渲染层 === */}
-      
-      {/* 1. 跃迁特效层 */}
+      <ApiKeyConfig onKeyUpdate={handleKeyUpdate} />
+
       {isWarping && (
           <div className="absolute inset-0 z-[100]">
               <Canvas camera={{ position: [0, 0, 5], fov: 90 }}>
@@ -167,7 +151,6 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* 2. 主视图层 */}
       <div className={`${isWarping ? 'opacity-0' : 'opacity-100'} transition-opacity duration-1000 w-full h-full`}>
           {viewScope === 'SYSTEM' ? (
               <Scene 
@@ -193,7 +176,6 @@ const App: React.FC = () => {
           )}
       </div>
 
-      {/* === UI: 加载遮罩 === */}
       {isGenerating && !isWarping && (
           <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center text-cyan-400">
               <Loader2 className="w-12 h-12 animate-spin mb-4" />
@@ -204,7 +186,6 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* === UI: 顶部标题 === */}
       {!isWarping && (
         <div className="absolute top-6 left-6 pointer-events-none z-10">
             <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]">
@@ -219,7 +200,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* === UI: 事件通知 === */}
       {currentEvent && viewScope === 'SYSTEM' && !isWarping && (
           <div className="absolute top-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top-10 duration-500">
               <div className="bg-black/80 backdrop-blur-xl border border-red-500/30 px-6 py-4 rounded-lg shadow-[0_0_30px_rgba(220,38,38,0.2)] flex items-start gap-4 max-w-md">
@@ -234,7 +214,6 @@ const App: React.FC = () => {
           </div>
       )}
 
-      {/* === UI: 底部栏 === */}
       {!isWarping && (
           <>
             {viewScope === 'SYSTEM' ? (
@@ -245,6 +224,7 @@ const App: React.FC = () => {
                     isGeneratingPlanet={isGenerating}
                     onResetView={handleResetView}
                     onToggleGalaxyMap={handleSwitchToGalaxyMap}
+                    hasApiKey={hasApiKey}
                 />
             ) : (
                 <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-20">
@@ -260,11 +240,11 @@ const App: React.FC = () => {
           </>
       )}
 
-      {/* === UI: 信息面板 === */}
       {selectedBody && viewScope === 'SYSTEM' && !isWarping && (
         <InfoPanel 
           body={selectedBody} 
           onClose={() => setSelectedBody(null)} 
+          hasApiKey={hasApiKey}
         />
       )}
 

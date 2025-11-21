@@ -233,12 +233,12 @@ export const OrbitSystem: React.FC<OrbitSystemProps> = ({
 
           {/* === 选中状态：包络面 (Envelope) === */}
           {isSelected && (
-            <mesh scale={[1.15, 1.15, 1.15]}>
-               <sphereGeometry args={[data.radius * settings.bodyScale, 32, 32]} />
+            <mesh scale={[1.05, 1.05, 1.05]}> {/* Scale tighter to body */}
+               <sphereGeometry args={[data.radius * settings.bodyScale, 64, 64]} />
                <meshBasicMaterial 
-                  color="#00ffff" 
+                  color="#ffffff" // White to be neutral
                   transparent 
-                  opacity={0.15} 
+                  opacity={0.05} // Very low opacity for "transparent" feel
                   side={THREE.BackSide} 
                   depthWrite={false}
                   blending={THREE.AdditiveBlending}
@@ -248,12 +248,12 @@ export const OrbitSystem: React.FC<OrbitSystemProps> = ({
 
           {/* 悬停光效 (未选中时) */}
           {!isSelected && hovered && (
-             <mesh scale={[1.1, 1.1, 1.1]}>
+             <mesh scale={[1.05, 1.05, 1.05]}>
               <sphereGeometry args={[data.radius * settings.bodyScale, 32, 32]} />
               <meshBasicMaterial 
                 color="#ffffff" 
                 transparent 
-                opacity={0.1} 
+                opacity={0.05} 
                 side={THREE.BackSide}
                 blending={THREE.AdditiveBlending}
               />
