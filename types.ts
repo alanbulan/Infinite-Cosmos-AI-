@@ -1,3 +1,4 @@
+
 // 定义天体类型
 export enum CelestialType {
   STAR = 'STAR',
@@ -15,10 +16,24 @@ export interface OrbitData {
   offset: number; // 初始相位偏移
 }
 
+export interface RingConfig {
+  innerRadius: number;
+  outerRadius: number;
+  color: string;
+  opacity: number;
+}
+
+export interface AsteroidBeltConfig {
+  minRadius: number;
+  maxRadius: number;
+  count: number;
+}
+
 // 天体基础数据
 export interface CelestialBodyData {
   id: string;
-  name: string;
+  name: string; // 恒星/天体本身的名称
+  systemName?: string; // 新增：星系整体的名称 (例如：太阳系 vs 太阳)
   type: CelestialType;
   description: string; // 简短描述
   color: string;
@@ -28,6 +43,8 @@ export interface CelestialBodyData {
   children?: CelestialBodyData[]; // 子天体 (卫星等)
   emissive?: boolean; // 是否发光 (恒星)
   rotationSpeed: number; // 自转速度
+  ringConfig?: RingConfig; // 新增：行星环配置
+  asteroidBelt?: AsteroidBeltConfig; // 新增：该星系内的陨石带配置
   
   // 生态/细节数据 (AI 生成后填充)
   ecosystemDetails?: {
@@ -43,8 +60,10 @@ export interface CelestialBodyData {
 export interface SimulationSettings {
   timeScale: number; // 时间流逝速度
   orbitScale: number; // 轨道显示比例
-  bodyScale: number; // 天体大小比例 (为了视觉效果通常会夸大行星大小)
+  bodyScale: number; // 天体大小比例 (不再由用户控制，内部固定优化值)
+  quality: 'LOW' | 'MEDIUM' | 'HIGH'; // 新增：画质设置
   showOrbits: boolean;
+  showLabels: boolean; 
   paused: boolean;
 }
 
@@ -52,4 +71,13 @@ export interface SimulationSettings {
 export interface SelectionState {
   selectedBodyId: string | null;
   focusMode: boolean; // 是否锁定摄像机跟随
+}
+
+// 随机事件
+export interface CosmicEvent {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: number;
+  type: 'anomaly' | 'discovery' | 'signal' | 'meteor';
 }
