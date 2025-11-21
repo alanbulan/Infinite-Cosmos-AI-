@@ -1,0 +1,5 @@
+{
+  "name": "Infinite Cosmos AI (无限宇宙)",
+  "description": "一个可无限扩展的3D宇宙模拟器，从太阳系开始。利用Gemini AI生成星球生态细节，支持缩放、参数调节与深度探索。",
+  "requestFramePermissions": []
+}
